@@ -31,6 +31,9 @@ from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
 from utils.scheduler import TaskScheduler
 
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -276,7 +279,7 @@ class TelegramBot:
         """Handle admin commands"""
         user = update.effective_user
         
-        if user.id not in [self.config.ADMIN_ID]:
+        if user.id not in self.config.ADMIN_IDS:
             await update.message.reply_text("غير مخول للوصول للوحة الإدارية.")
             return
         
@@ -295,7 +298,7 @@ class TelegramBot:
         """Show bot statistics"""
         user = update.effective_user
         
-        if user.id not in [self.config.ADMIN_ID]:
+        if user.id not in self.config.ADMIN_IDS:
             await update.message.reply_text("غير مخول للوصول لهذا الأمر.")
             return
         
@@ -321,7 +324,7 @@ class TelegramBot:
         """Broadcast message to all users"""
         user = update.effective_user
         
-        if user.id not in [self.config.ADMIN_ID]:
+        if user.id not in self.config.ADMIN_IDS:
             await update.message.reply_text("غير مخول للوصول لهذا الأمر.")
             return
         

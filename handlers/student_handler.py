@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime, timedelta
 import asyncio
 
-from models import DatabaseManager, PostgreSQLManager
+from models import get_database_manager
 from services.content_service import ContentService
 from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
