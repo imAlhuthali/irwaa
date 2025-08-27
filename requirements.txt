@@ -1,0 +1,60 @@
+# Core Telegram Bot
+python-telegram-bot==20.7
+python-telegram-bot[webhooks]==20.7
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.23
+alembic==1.12.1
+
+# Data Processing
+pandas==2.1.4
+openpyxl==3.1.2
+xlrd==2.0.1
+
+# File Handling
+aiofiles==23.2.1
+
+# HTTP Requests
+aiohttp==3.9.1
+httpx==0.25.2
+
+# Environment Management
+python-dotenv==1.0.0
+
+# Logging and Monitoring
+structlog==23.2.0
+
+# Date/Time
+python-dateutil==2.8.2
+
+# JSON handling
+orjson==3.9.10
+
+# Utilities
+pathlib==1.0.1
+
+# Security
+cryptography==41.0.8
+
+# Development Dependencies (optional)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+
+# Production Dependencies
+gunicorn==21.2.0
+redis==5.0.1
+
+# Optional: For advanced analytics
+matplotlib==3.8.2
+seaborn==0.13.0
+
+# Optional: For better performance
+ujson==5.8.0
