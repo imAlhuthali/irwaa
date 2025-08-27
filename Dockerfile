@@ -15,6 +15,7 @@ RUN apt-get update \
         curl \
         gcc \
         g++ \
+        libpq-dev \
         && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -30,17 +31,17 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p /app/logs /app/uploads /app/content /app/quiz_templates
 
-# Create non-root user
+# Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
+# Railway automatically sets the PORT environment variable
 EXPOSE 8000
 
-# Health check
+# Health check - Railway compatible
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Run the application
-CMD ["python", "main.py"]
+# Use Railway's environment variables
+CMD python main.py

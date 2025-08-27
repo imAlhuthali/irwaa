@@ -8,6 +8,7 @@ import logging
 import sys
 import asyncio
 import signal
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -22,7 +23,7 @@ from fastapi.responses import JSONResponse
 import json
 
 from config.settings import BotConfig
-from models.database import DatabaseManager
+from models import get_database_manager
 from handlers.student_handler import StudentHandler, AWAITING_NAME, AWAITING_PHONE, AWAITING_SECTION
 from services.content_service import ContentService
 from services.quiz_service import QuizService
@@ -44,7 +45,7 @@ class TelegramBot:
     def __init__(self):
         self.config = BotConfig()
         self.app: Optional[Application] = None
-        self.db_manager: Optional[DatabaseManager] = None
+        self.db_manager = None
         self.student_handler: Optional[StudentHandler] = None
         self.content_service: Optional[ContentService] = None
         self.quiz_service: Optional[QuizService] = None
@@ -57,7 +58,7 @@ class TelegramBot:
         try:
             # Initialize database
             logger.info("Initializing database connection...")
-            self.db_manager = DatabaseManager(self.config.DATABASE_URL)
+            self.db_manager = get_database_manager()
             await self.db_manager.initialize()
             
             # Initialize services
@@ -424,9 +425,11 @@ async def main():
         # Choose mode based on configuration
         if bot.config.USE_WEBHOOK:
             logger.info("Starting in webhook mode...")
+            # Use Railway's PORT environment variable if available
+            port = int(os.getenv('PORT', bot.config.WEBHOOK_PORT))
             await bot.start_webhook(
                 host=bot.config.WEBHOOK_HOST,
-                port=bot.config.WEBHOOK_PORT
+                port=port
             )
         else:
             logger.info("Starting in polling mode...")
