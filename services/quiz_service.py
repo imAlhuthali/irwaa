@@ -2,21 +2,20 @@ import logging
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 import asyncio
-import pandas as pd
-import io
 import json
 import random
 from pathlib import Path
 import aiofiles
+import openpyxl
 
-from models.database import DatabaseManager
+from models import get_database_manager
 
 logger = logging.getLogger(__name__)
 
 class QuizService:
     """Service for managing quizzes and Excel parsing functionality"""
     
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self, db_manager):
         self.db = db_manager
         self.quiz_templates_dir = Path("quiz_templates")
         self.quiz_templates_dir.mkdir(exist_ok=True)

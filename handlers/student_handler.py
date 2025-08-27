@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from datetime import datetime, timedelta
 import asyncio
 
-from models.database import DatabaseManager
+from models import DatabaseManager, PostgreSQLManager
 from services.content_service import ContentService
 from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 AWAITING_NAME, AWAITING_PHONE, AWAITING_SECTION = range(3)
 
 class StudentHandler:
-    def __init__(self, db_manager: DatabaseManager, content_service: ContentService, 
+    def __init__(self, db_manager, content_service: ContentService, 
                  quiz_service: QuizService, analytics_service: AnalyticsService):
         self.db = db_manager
         self.content_service = content_service

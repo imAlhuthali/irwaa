@@ -24,18 +24,16 @@ railway init
 
 # Add PostgreSQL database
 echo "🗄️ Adding PostgreSQL database..."
-railway add --database postgresql
+railway add --database postgres
 
 # Set environment variables
 echo "⚙️ Setting environment variables..."
 echo "Please set these environment variables in Railway dashboard:"
 echo "1. BOT_TOKEN=your_telegram_bot_token"
-echo "2. ADMIN_IDS=your_admin_user_ids (comma-separated)"
-echo "3. USE_WEBHOOK=true"
-echo "4. WEBHOOK_HOST=0.0.0.0"
-echo "5. WEBHOOK_PORT=8000"
-echo "6. DEBUG=false"
-echo "7. LOG_LEVEL=INFO"
+echo "2. ADMIN_ID=your_admin_user_id"
+echo "3. WEBHOOK_URL=your_railway_app_url (will be provided after deployment)"
+echo "4. DEBUG=false"
+echo "5. LOG_LEVEL=INFO"
 
 echo ""
 echo "The DATABASE_URL will be automatically set by Railway when you add PostgreSQL."

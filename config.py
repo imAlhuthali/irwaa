@@ -4,8 +4,8 @@ import pytz
 
 class Config:
     # Bot Configuration
-    BOT_TOKEN = "8493318835:AAHm-VnleP9u4mVlmSsjIA3SJGVo1riN8lY"
-    ADMIN_ID = 6651738535
+    BOT_TOKEN = os.getenv('BOT_TOKEN', '')
+    ADMIN_ID = int(os.getenv('ADMIN_ID', '6651738535'))
     
     # Database Configuration
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///arabic_learning_bot.db')

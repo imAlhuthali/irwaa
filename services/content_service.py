@@ -8,14 +8,14 @@ from pathlib import Path
 import hashlib
 import mimetypes
 
-from models.database import DatabaseManager
+from models import get_database_manager
 
 logger = logging.getLogger(__name__)
 
 class ContentService:
     """Service for managing educational content and weekly materials"""
     
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self, db_manager):
         self.db = db_manager
         self.content_dir = Path("content")
         self.uploads_dir = Path("uploads")

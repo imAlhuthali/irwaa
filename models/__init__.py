@@ -10,6 +10,9 @@ def get_database_manager():
     database_url = os.getenv('DATABASE_URL', 'sqlite+aiosqlite:///./telebot.db')
     
     if database_url.startswith('postgresql://') or database_url.startswith('postgres://'):
+        # Railway uses postgres:// but asyncpg needs postgresql://
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
         # Use PostgreSQL manager for production
         return PostgreSQLManager(database_url)
     else:

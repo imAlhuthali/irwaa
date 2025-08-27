@@ -22,7 +22,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 import json
 
-from config.settings import BotConfig
+from config import Config
 from models import get_database_manager
 from handlers.student_handler import StudentHandler, AWAITING_NAME, AWAITING_PHONE, AWAITING_SECTION
 from services.content_service import ContentService
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 class TelegramBot:
     def __init__(self):
-        self.config = BotConfig()
+        self.config = Config()
         self.app: Optional[Application] = None
         self.db_manager = None
         self.student_handler: Optional[StudentHandler] = None
@@ -275,7 +275,7 @@ class TelegramBot:
         """Handle admin commands"""
         user = update.effective_user
         
-        if user.id not in self.config.ADMIN_IDS:
+        if user.id not in [self.config.ADMIN_ID]:
             await update.message.reply_text("غير مخول للوصول للوحة الإدارية.")
             return
         
@@ -294,7 +294,7 @@ class TelegramBot:
         """Show bot statistics"""
         user = update.effective_user
         
-        if user.id not in self.config.ADMIN_IDS:
+        if user.id not in [self.config.ADMIN_ID]:
             await update.message.reply_text("غير مخول للوصول لهذا الأمر.")
             return
         
@@ -320,7 +320,7 @@ class TelegramBot:
         """Broadcast message to all users"""
         user = update.effective_user
         
-        if user.id not in self.config.ADMIN_IDS:
+        if user.id not in [self.config.ADMIN_ID]:
             await update.message.reply_text("غير مخول للوصول لهذا الأمر.")
             return
         
@@ -423,12 +423,12 @@ async def main():
         await bot.initialize()
         
         # Choose mode based on configuration
-        if bot.config.USE_WEBHOOK:
+        if bot.config.WEBHOOK_URL:
             logger.info("Starting in webhook mode...")
             # Use Railway's PORT environment variable if available
-            port = int(os.getenv('PORT', bot.config.WEBHOOK_PORT))
+            port = int(os.getenv('PORT', bot.config.PORT))
             await bot.start_webhook(
-                host=bot.config.WEBHOOK_HOST,
+                host="0.0.0.0",
                 port=port
             )
         else:

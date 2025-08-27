@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 
-from models.database import DatabaseManager
+from models import get_database_manager
 from services.content_service import ContentService
 from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
@@ -39,7 +39,7 @@ class ScheduledTask:
 class TaskScheduler:
     """Scheduler for automated tasks and system maintenance"""
     
-    def __init__(self, db_manager: DatabaseManager, content_service: ContentService,
+    def __init__(self, db_manager, content_service: ContentService,
                  quiz_service: QuizService, analytics_service: AnalyticsService):
         self.db = db_manager
         self.content_service = content_service

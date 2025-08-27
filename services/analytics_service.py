@@ -7,7 +7,7 @@ from collections import defaultdict, Counter
 from dataclasses import dataclass
 from enum import Enum
 
-from models.database import DatabaseManager
+from models import get_database_manager
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class StudentActivity:
 class AnalyticsService:
     """Service for analytics, progress tracking, and real-time dashboard"""
     
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self, db_manager):
         self.db = db_manager
         self.activity_buffer = []
         self.buffer_size = 100
