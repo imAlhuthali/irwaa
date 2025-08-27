@@ -2,7 +2,7 @@
 """
 Educational Telegram Bot - Main Application
 Handles webhook configuration and bot initialization
-Version: 1.0.1 - Railway Production Ready
+Version: 1.0.2 - Railway Production Ready
 """
 
 import logging
