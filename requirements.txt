@@ -1,21 +1,18 @@
 # Core Telegram Bot
 python-telegram-bot==20.7
-python-telegram-bot[webhooks]==20.7
 
 # Web Framework
 fastapi==0.104.1
-uvicorn[standard]==0.24.0
+uvicorn==0.24.0
 
 # Database
 asyncpg==0.29.0
 sqlalchemy[asyncio]==2.0.23
-alembic==1.13.0
 psycopg2-binary==2.9.9
 
 # Data Processing
 pandas==2.1.4
 openpyxl==3.1.2
-xlrd==2.0.1
 
 # File Handling
 aiofiles==23.2.1
@@ -27,20 +24,14 @@ httpx==0.25.2
 # Environment Management
 python-dotenv==1.0.0
 
-# Logging and Monitoring
-structlog==23.2.0
-
 # Date/Time
 python-dateutil==2.8.2
 
-# JSON handling
-orjson==3.9.10
+# JSON handling - remove orjson as it can be problematic
+# orjson==3.9.10
 
-# Security - using latest compatible version
-cryptography>=41.0.0,<46.0.0
+# Security - using a more compatible version
+cryptography==42.0.8
 
 # Production Dependencies
 gunicorn==21.2.0
-
-# Core utilities only - removing problematic ones
-ujson==5.8.0
