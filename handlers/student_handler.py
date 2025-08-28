@@ -12,7 +12,7 @@ from services.analytics_service import AnalyticsService
 
 logger = logging.getLogger(__name__)
 
-# Conversation states
+# Conversation states (kept for compatibility, may be used for other features)
 AWAITING_NAME, AWAITING_PHONE, AWAITING_SECTION = range(3)
 
 class StudentHandler:
@@ -39,8 +39,9 @@ class StudentHandler:
             ]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
             
+            display_name = existing_student.get('name') or user.first_name or user.username or 'صديق'
             await update.message.reply_text(
-                f"مرحباً بك مرة أخرى {existing_student['name']}! 👋\n\n"
+                f"مرحباً بك مرة أخرى {display_name}! 👋\n\n"
                 "كيف يمكنني مساعدتك اليوم؟",
                 reply_markup=reply_markup
             )
@@ -51,71 +52,25 @@ class StudentHandler:
             )
             return ConversationHandler.END
 
-        # New user registration
-        await update.message.reply_text(
-            "أهلاً وسهلاً بك في بوت التعلم! 📚\n\n"
-            "لنقوم بتسجيل بياناتك أولاً\n"
-            "الرجاء إدخال اسمك الكامل:"
-        )
-        return AWAITING_NAME
+        # Auto-register new user with Telegram info
+        await self._auto_register_user(update, context)
+        return ConversationHandler.END
 
-    async def register_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Register student name"""
-        name = update.message.text.strip()
-        
-        if len(name) < 2:
-            await update.message.reply_text("الرجاء إدخال اسم صحيح (أكثر من حرفين):")
-            return AWAITING_NAME
-        
-        context.user_data['name'] = name
-        await update.message.reply_text(
-            f"شكراً {name}! 😊\n\n"
-            "الرجاء إدخال رقم هاتفك (مطلوب للتواصل):"
-        )
-        return AWAITING_PHONE
-
-    async def register_phone(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Register student phone"""
-        phone = update.message.text.strip()
-        
-        # Basic phone validation
-        if not phone.replace('+', '').replace('-', '').replace(' ', '').isdigit() or len(phone) < 8:
-            await update.message.reply_text("الرجاء إدخال رقم هاتف صحيح:")
-            return AWAITING_PHONE
-        
-        context.user_data['phone'] = phone
-        
-        # Get available sections
-        sections = await self.db.get_available_sections()
-        if not sections:
-            sections = ["الصف الأول", "الصف الثاني", "الصف الثالث"]
-        
-        keyboard = []
-        for section in sections:
-            keyboard.append([InlineKeyboardButton(section, callback_data=f"section:{section}")])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            "اختر صفك الدراسي:",
-            reply_markup=reply_markup
-        )
-        return AWAITING_SECTION
-
-    async def register_section(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Complete student registration"""
-        query = update.callback_query
-        await query.answer()
-        
-        section = query.data.replace("section:", "")
+    async def _auto_register_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Automatically register user using Telegram information"""
         user = update.effective_user
         
-        # Create student record
+        # Use Telegram's built-in information
+        display_name = user.first_name or user.username or f"مستخدم{user.id}"
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or display_name
+        
+        # Create student record with Telegram info
         student_data = {
             'telegram_id': user.id,
             'username': user.username or '',
-            'name': context.user_data['name'],
-            'phone': context.user_data['phone'],
-            'section': section,
+            'name': full_name,
+            'phone': '',  # Not required anymore
+            'section': 'عام',  # Default section, can be changed in settings
             'registration_date': datetime.now(),
             'is_active': True,
             'notification_enabled': True
@@ -133,29 +88,27 @@ class StudentHandler:
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
             
             welcome_message = (
-                f"تم تسجيلك بنجاح! 🎉\n\n"
-                f"الاسم: {context.user_data['name']}\n"
-                f"الصف: {section}\n\n"
+                f"مرحباً بك {display_name}! 🎉\n\n"
+                f"تم تسجيلك تلقائياً في النظام\n"
+                f"الاسم: {full_name}\n"
+                f"الصف: عام (يمكنك تغييره في الإعدادات)\n\n"
                 "يمكنك الآن الوصول إلى جميع الميزات. استخدم الأزرار أدناه للتنقل."
             )
             
-            await query.edit_message_text(welcome_message, reply_markup=reply_markup)
+            await update.message.reply_text(welcome_message, reply_markup=reply_markup)
             
             # Log registration
             await self.analytics_service.log_student_activity(
-                student_id, 'registration', {'section': section}
+                student_id, 'auto_registration', {'telegram_username': user.username}
             )
-            
-            # Clear user data
-            context.user_data.clear()
             
         except Exception as e:
-            logger.error(f"Registration error: {e}")
-            await query.edit_message_text(
-                "حدث خطأ أثناء التسجيل. الرجاء المحاولة مرة أخرى لاحقاً."
+            logger.error(f"Auto registration error: {e}")
+            await update.message.reply_text(
+                f"مرحباً بك {display_name}! 👋\n\n"
+                "حدث خطأ بسيط في التسجيل، ولكن يمكنك المتابعة واستخدام البوت.\n"
+                "سيتم إعادة المحاولة تلقائياً عند استخدام أي ميزة."
             )
-        
-        return ConversationHandler.END
 
     async def weekly_materials(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show weekly materials"""
@@ -316,16 +269,18 @@ class StudentHandler:
         
         keyboard = [
             [InlineKeyboardButton("🔔 إعدادات الإشعارات", callback_data="toggle_notifications")],
-            [InlineKeyboardButton("✏️ تعديل البيانات", callback_data="edit_profile")],
-            [InlineKeyboardButton("🔄 إعادة تعيين التقدم", callback_data="reset_progress")],
+            [InlineKeyboardButton("📚 تغيير الصف", callback_data="change_section")],
             [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        display_name = student['name'] or user.first_name or user.username or 'مستخدم'
+        phone_display = student.get('phone', '') or 'غير محدد'
+        
         settings_text = (
             f"⚙️ الإعدادات\n\n"
-            f"👤 الاسم: {student['name']}\n"
-            f"📞 الهاتف: {student['phone']}\n"
+            f"👤 الاسم: {display_name}\n"
+            f"📱 معرف التيليجرام: @{user.username or 'غير محدد'}\n"
             f"📚 الصف: {student['section']}\n"
             f"🔔 الإشعارات: {notification_status}\n\n"
             "اختر الإعداد الذي تريد تغييره:"
@@ -398,6 +353,13 @@ class StudentHandler:
                 await self._refresh_materials(query, user.id)
             elif data == "toggle_notifications":
                 await self._toggle_notifications(query, user.id)
+            elif data == "change_section":
+                await self._show_section_selection(query, user.id)
+            elif data.startswith("select_section:"):
+                section = data.replace("select_section:", "")
+                await self._update_user_section(query, user.id, section)
+            elif data == "settings_menu":
+                await self._show_settings_menu(query, user.id)
             elif data == "detailed_progress":
                 await self._show_detailed_progress(query, user.id)
             # Add more callback handlers as needed
@@ -468,13 +430,90 @@ class StudentHandler:
             await self.db.update_student_notification_setting(user_id, new_setting)
             
             status = "مفعلة ✅" if new_setting else "معطلة ❌"
+            keyboard = [[InlineKeyboardButton("🔙 الإعدادات", callback_data="settings_menu")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await query.edit_message_text(
-                f"تم تحديث إعدادات الإشعارات!\n\nالحالة الحالية: {status}"
+                f"تم تحديث إعدادات الإشعارات!\n\nالحالة الحالية: {status}",
+                reply_markup=reply_markup
             )
             
         except Exception as e:
             logger.error(f"Error toggling notifications: {e}")
             await query.edit_message_text("حدث خطأ في تحديث الإعدادات.")
+
+    async def _show_section_selection(self, query, user_id: int):
+        """Show available sections for selection"""
+        try:
+            sections = await self.db.get_available_sections()
+            if not sections:
+                sections = ["الصف الأول", "الصف الثاني", "الصف الثالث", "الصف الرابع", "عام"]
+            
+            keyboard = []
+            for section in sections:
+                keyboard.append([InlineKeyboardButton(section, callback_data=f"select_section:{section}")])
+            
+            keyboard.append([InlineKeyboardButton("🔙 الإعدادات", callback_data="settings_menu")])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "📚 اختر صفك الدراسي:\n\nيمكنك تغيير الصف في أي وقت من الإعدادات",
+                reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            logger.error(f"Error showing section selection: {e}")
+            await query.edit_message_text("حدث خطأ في عرض الأقسام.")
+
+    async def _update_user_section(self, query, user_id: int, section: str):
+        """Update user's section"""
+        try:
+            await self.db.update_student_section(user_id, section)
+            
+            keyboard = [[InlineKeyboardButton("🔙 الإعدادات", callback_data="settings_menu")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"✅ تم تحديث صفك الدراسي!\n\nالصف الحالي: {section}",
+                reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            logger.error(f"Error updating section: {e}")
+            await query.edit_message_text("حدث خطأ في تحديث الصف.")
+
+    async def _show_settings_menu(self, query, user_id: int):
+        """Show settings menu"""
+        try:
+            student = await self.db.get_student_by_telegram_id(user_id)
+            if not student:
+                await query.edit_message_text("الرجاء التسجيل أولاً.")
+                return
+            
+            notification_status = "مفعلة ✅" if student['notification_enabled'] else "معطلة ❌"
+            display_name = student['name'] or query.from_user.first_name or query.from_user.username or 'مستخدم'
+            
+            keyboard = [
+                [InlineKeyboardButton("🔔 إعدادات الإشعارات", callback_data="toggle_notifications")],
+                [InlineKeyboardButton("📚 تغيير الصف", callback_data="change_section")],
+                [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            settings_text = (
+                f"⚙️ الإعدادات\n\n"
+                f"👤 الاسم: {display_name}\n"
+                f"📱 معرف التيليجرام: @{query.from_user.username or 'غير محدد'}\n"
+                f"📚 الصف: {student['section']}\n"
+                f"🔔 الإشعارات: {notification_status}\n\n"
+                "اختر الإعداد الذي تريد تغييره:"
+            )
+            
+            await query.edit_message_text(settings_text, reply_markup=reply_markup)
+            
+        except Exception as e:
+            logger.error(f"Error showing settings: {e}")
+            await query.edit_message_text("حدث خطأ في عرض الإعدادات.")
 
     def get_conversation_handler(self):
         """Return the conversation handler for registration"""

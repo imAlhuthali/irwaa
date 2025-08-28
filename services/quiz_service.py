@@ -12,6 +12,8 @@ from models import get_database_manager
 
 logger = logging.getLogger(__name__)
 
+# Fixed pandas import issue - service v2.1
+
 class QuizService:
     """Service for managing quizzes and Excel parsing functionality"""
     

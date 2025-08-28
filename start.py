@@ -45,16 +45,33 @@ async def main():
         if admin_ids:
             logger.info(f"Admin IDs: {admin_ids}")
         
-        if not bot_token:
-            logger.warning("BOT_TOKEN not set - starting health-only mode")
+        if not bot_token or not admin_ids:
+            logger.warning("Required environment variables not set - starting health-only mode")
+            await start_health_server()
+            return
+        
+        # Test basic imports before proceeding
+        try:
+            logger.info("🔍 Testing critical imports...")
+            from config.settings import BotConfig
+            from models import get_database_manager
+            logger.info("✅ Critical imports successful")
+        except Exception as import_error:
+            logger.error(f"❌ Critical import failed: {import_error}")
+            logger.error("Starting health server due to import failure")
             await start_health_server()
             return
             
         # Initialize database tables first
-        await initialize_database_tables()
-        
-        # Test database connection before starting bot
-        await test_database_connection()
+        try:
+            await initialize_database_tables()
+            # Test database connection before starting bot
+            await test_database_connection()
+        except Exception as db_error:
+            logger.error(f"❌ Database initialization failed: {db_error}")
+            logger.error("Starting health server due to database failure")
+            await start_health_server()
+            return
         
         logger.info("🤖 Starting main bot application...")
         try:
@@ -65,14 +82,22 @@ async def main():
             logger.error(f"❌ Failed to start main bot: {main_error}")
             import traceback
             logger.error(f"Main bot error traceback: {traceback.format_exc()}")
-            raise
+            # Fallback to health server
+            logger.info("Falling back to health server...")
+            await start_health_server()
         
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
         # Start health server as fallback
-        await start_health_server()
+        logger.info("Starting health server as final fallback...")
+        try:
+            await start_health_server()
+        except Exception as health_error:
+            logger.error(f"❌ Even health server failed: {health_error}")
+            # Create the most basic possible health server
+            await start_minimal_health_server()
 
 async def test_database_connection():
     """Test database connection before starting bot"""
@@ -238,30 +263,86 @@ async def initialize_database_tables():
 
 async def start_health_server():
     """Start minimal health server for Railway"""
-    from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
-    import uvicorn
+    try:
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
+        import uvicorn
+        
+        app = FastAPI()
+        
+        @app.get("/health")
+        async def health():
+            return JSONResponse({
+                "status": "waiting_for_config",
+                "message": "Please set BOT_TOKEN and ADMIN_IDS environment variables"
+            })
+        
+        @app.get("/")
+        async def root():
+            return JSONResponse({
+                "message": "Educational Telegram Bot",
+                "status": "Configuration required"
+            })
+        
+        port = int(os.getenv("PORT", 8000))
+        logger.info(f"Starting health server on port {port}")
+        config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
+        server = uvicorn.Server(config)
+        await server.serve()
+    except Exception as e:
+        logger.error(f"FastAPI health server failed: {e}")
+        await start_minimal_health_server()
+
+async def start_minimal_health_server():
+    """Start the most basic HTTP server possible"""
+    import asyncio
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import threading
+    import json
     
-    app = FastAPI()
-    
-    @app.get("/health")
-    async def health():
-        return JSONResponse({
-            "status": "waiting_for_config",
-            "message": "Please set BOT_TOKEN and ADMIN_IDS environment variables"
-        })
-    
-    @app.get("/")
-    async def root():
-        return JSONResponse({
-            "message": "Educational Telegram Bot",
-            "status": "Configuration required"
-        })
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == '/health':
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = {
+                    "status": "minimal_health_server",
+                    "message": "Basic health check working"
+                }
+                self.wfile.write(json.dumps(response).encode())
+            elif self.path == '/':
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = {
+                    "message": "Educational Telegram Bot - Minimal Mode",
+                    "status": "basic_health_only"
+                }
+                self.wfile.write(json.dumps(response).encode())
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def log_message(self, format, *args):
+            pass  # Suppress default logging
     
     port = int(os.getenv("PORT", 8000))
-    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
+    logger.info(f"Starting minimal health server on port {port}")
+    
+    server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    
+    def run_server():
+        server.serve_forever()
+    
+    thread = threading.Thread(target=run_server)
+    thread.daemon = True
+    thread.start()
+    
+    # Keep the async function running
+    while True:
+        await asyncio.sleep(60)
+        logger.info("Minimal health server still running...")
 
 if __name__ == "__main__":
     asyncio.run(main())
