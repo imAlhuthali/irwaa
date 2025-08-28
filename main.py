@@ -190,7 +190,6 @@ class TelegramBot:
     def _setup_webhook_endpoint(self):
         """Setup FastAPI webhook endpoint"""
         @self.fastapi_app.post(f"/webhook/{self.config.BOT_TOKEN}")
-        @self.limiter.limit("200/minute")  # Higher limit for webhook endpoint
         async def webhook_handler(request: Request):
             try:
                 # Get update from request

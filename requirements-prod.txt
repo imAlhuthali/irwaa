@@ -8,7 +8,7 @@ uvicorn==0.24.0
 # Database - Production PostgreSQL
 asyncpg==0.29.0
 
-# Database - Development SQLite
+# Database - Development SQLite fallback
 aiosqlite==0.19.0
 
 # File Handling
@@ -20,12 +20,3 @@ python-dotenv==1.0.0
 # Date/Time
 python-dateutil==2.8.2
 pytz==2023.3
-
-# Excel processing (for quiz templates)
-openpyxl==3.1.2
-
-# Production scalability and security - DISABLED FOR NOW
-# slowapi==0.1.9
-# redis==5.0.1  
-# structlog==23.2.0
-# prometheus-client==0.19.0
