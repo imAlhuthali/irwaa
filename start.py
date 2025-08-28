@@ -8,6 +8,10 @@ import os
 import sys
 import asyncio
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
 
 # Ensure logs directory exists
 os.makedirs('logs', exist_ok=True)

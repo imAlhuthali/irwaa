@@ -109,8 +109,9 @@ class TelegramBot:
             # Setup handlers
             await self._setup_handlers()
             
-            # Setup bot commands
-            await self._setup_bot_commands()
+            # Setup bot commands (skip if test token)
+            if not self.config.BOT_TOKEN.startswith('test_'):
+                await self._setup_bot_commands()
             
             # Setup FastAPI webhook endpoint
             self._setup_webhook_endpoint()
