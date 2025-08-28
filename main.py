@@ -23,10 +23,32 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 import json
 
-# Production scalability imports
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+# Production scalability imports with fallback
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    RATE_LIMITING_AVAILABLE = True
+except ImportError:
+    print("WARNING: Rate limiting dependencies not available, using basic implementation")
+    RATE_LIMITING_AVAILABLE = False
+    # Fallback implementations
+    class MockLimiter:
+        def __init__(self, *args, **kwargs):
+            pass
+        def limit(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+    
+    Limiter = MockLimiter
+    RateLimitExceeded = Exception
+    
+    def _rate_limit_exceeded_handler(*args, **kwargs):
+        pass
+    
+    def get_remote_address(*args, **kwargs):
+        return "0.0.0.0"
 
 from config.settings import BotConfig
 from models import get_database_manager
@@ -36,14 +58,58 @@ from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
 from services.learning_progression_service import LearningProgressionService
 from utils.scheduler import TaskScheduler
-from utils.cache import cache_manager
-from utils.circuit_breaker import with_database_circuit_breaker
-from utils.monitoring import (
-    comprehensive_health_check, 
-    get_metrics_response,
-    track_request,
-    metrics_updater_task
-)
+
+# Optional production imports with fallbacks
+try:
+    from utils.cache import cache_manager
+    CACHE_AVAILABLE = True
+except ImportError:
+    print("WARNING: Cache utilities not available, using mock implementation")
+    CACHE_AVAILABLE = False
+    class MockCacheManager:
+        async def initialize(self): pass
+        async def close(self): pass
+    cache_manager = MockCacheManager()
+
+try:
+    from utils.circuit_breaker import with_database_circuit_breaker
+    CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    print("WARNING: Circuit breaker not available, using direct calls")
+    CIRCUIT_BREAKER_AVAILABLE = False
+    def with_database_circuit_breaker(func):
+        return func
+
+try:
+    from utils.monitoring import (
+        comprehensive_health_check, 
+        get_metrics_response,
+        track_request,
+        metrics_updater_task
+    )
+    MONITORING_AVAILABLE = True
+except ImportError:
+    print("WARNING: Monitoring utilities not available, using basic implementation")
+    MONITORING_AVAILABLE = False
+    
+    async def comprehensive_health_check(bot_instance):
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "components": {"basic": "operational"}
+        }
+    
+    def get_metrics_response():
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse("# Metrics not available\n")
+    
+    from contextlib import asynccontextmanager
+    @asynccontextmanager
+    async def track_request(endpoint: str):
+        yield
+    
+    async def metrics_updater_task(bot_instance):
+        pass
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -53,18 +119,31 @@ PRODUCTION_MODE = os.getenv('ENVIRONMENT', 'development') == 'production'
 
 if PRODUCTION_MODE:
     # Structured JSON logging for production
-    import structlog
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            structlog.processors.JSONRenderer()
-        ],
-        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-        logger_factory=structlog.WriteLoggerFactory(),
-        cache_logger_on_first_use=True,
-    )
-    logger = structlog.get_logger(__name__)
+    try:
+        import structlog
+        structlog.configure(
+            processors=[
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.processors.add_log_level,
+                structlog.processors.JSONRenderer()
+            ],
+            wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+            logger_factory=structlog.WriteLoggerFactory(),
+            cache_logger_on_first_use=True,
+        )
+        logger = structlog.get_logger(__name__)
+        logging.info("✅ Structured logging initialized")
+    except ImportError:
+        logging.warning("Structured logging not available, using basic logging")
+        logging.basicConfig(
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            level=logging.INFO,
+            handlers=[
+                logging.FileHandler('logs/bot.log'),
+                logging.StreamHandler(sys.stdout)
+            ]
+        )
+        logger = logging.getLogger(__name__)
 else:
     # Traditional logging for development
     logging.basicConfig(
@@ -99,12 +178,17 @@ class TelegramBot:
         self.fastapi_app = FastAPI(title="Educational Telegram Bot API")
         
         # Rate limiter - Critical for 7000+ users protection
-        self.limiter = Limiter(
-            key_func=get_remote_address,
-            default_limits=["100/minute", "2000/hour"]  # Conservative limits for educational use
-        )
-        self.fastapi_app.state.limiter = self.limiter
-        self.fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+        if RATE_LIMITING_AVAILABLE:
+            self.limiter = Limiter(
+                key_func=get_remote_address,
+                default_limits=["100/minute", "2000/hour"]  # Conservative limits for educational use
+            )
+            self.fastapi_app.state.limiter = self.limiter
+            self.fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+            logger.info("✅ Rate limiting enabled")
+        else:
+            self.limiter = Limiter()  # Mock limiter
+            logger.warning("⚠️ Rate limiting disabled (dependencies not available)")
         
     async def initialize(self):
         """Initialize all bot components"""
@@ -117,9 +201,12 @@ class TelegramBot:
             logger.info("Database tables created/verified successfully")
             
             # Initialize Redis cache for production scalability
-            logger.info("Initializing cache layer...")
-            await cache_manager.initialize()
-            logger.info("Cache layer ready")
+            if CACHE_AVAILABLE:
+                logger.info("Initializing cache layer...")
+                await cache_manager.initialize()
+                logger.info("Cache layer ready")
+            else:
+                logger.warning("Cache layer disabled (dependencies not available)")
             
             # Initialize services
             logger.info("Initializing services...")
@@ -159,8 +246,11 @@ class TelegramBot:
             await self.scheduler.start()
             
             # Start metrics updater for production monitoring
-            logger.info("Starting production monitoring...")
-            asyncio.create_task(metrics_updater_task(self))
+            if MONITORING_AVAILABLE:
+                logger.info("Starting production monitoring...")
+                asyncio.create_task(metrics_updater_task(self))
+            else:
+                logger.info("Basic monitoring active (enhanced monitoring disabled)")
             
             logger.info("Bot initialization completed successfully!")
             

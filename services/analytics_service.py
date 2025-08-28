@@ -690,14 +690,18 @@ class AnalyticsService:
                         'session_id': activity.session_id
                     })
                 
-                # Use circuit breaker for database operations
-                from utils.circuit_breaker import with_database_circuit_breaker
-                
-                @with_database_circuit_breaker
-                async def flush_to_db():
-                    return await self.db.bulk_insert_activities(activities_data)
-                
-                await flush_to_db()
+                # Use circuit breaker for database operations if available
+                try:
+                    from utils.circuit_breaker import with_database_circuit_breaker
+                    
+                    @with_database_circuit_breaker
+                    async def flush_to_db():
+                        return await self.db.bulk_insert_activities(activities_data)
+                    
+                    await flush_to_db()
+                except ImportError:
+                    # Direct database call if circuit breaker not available
+                    await self.db.bulk_insert_activities(activities_data)
                 
                 # Only clear buffer after successful database write
                 self.activity_buffer = self.activity_buffer[buffer_size:]

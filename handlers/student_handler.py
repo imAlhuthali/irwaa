@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any, List, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import ContextTypes
 from datetime import datetime, timedelta
 import asyncio
 
@@ -25,36 +25,51 @@ class StudentHandler:
         self.analytics_service = analytics_service
         self.learning_service = learning_service
 
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command in Arabic"""
-        user = update.effective_user
-        
-        # Check if user is already registered
-        existing_student = await self.db.get_student_by_telegram_id(user.id)
-        if existing_student:
-            keyboard = [
-                [KeyboardButton("📚 المواد الأسبوعية"), KeyboardButton("📝 الاختبارات")],
-                [KeyboardButton("📊 تقدمي"), KeyboardButton("⚙️ الإعدادات")],
-                [KeyboardButton("📞 التواصل"), KeyboardButton("ℹ️ المساعدة")]
-            ]
-            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+        try:
+            user = update.effective_user
+            logger.info(f"🚀 Start command received from user {user.id} (@{user.username or 'no_username'})")
             
-            display_name = existing_student.get('name') or user.first_name or user.username or 'صديق'
-            await update.message.reply_text(
-                f"مرحباً بك مرة أخرى {display_name}! 👋\n\n"
-                "كيف يمكنني مساعدتك اليوم؟",
-                reply_markup=reply_markup
-            )
-            
-            # Log student activity
-            await self.analytics_service.log_student_activity(
-                existing_student['id'], 'start_command', {'action': 'returning_user'}
-            )
-            return ConversationHandler.END
+            # Check if user is already registered
+            logger.info(f"Checking if user {user.id} is already registered...")
+            existing_student = await self.db.get_student_by_telegram_id(user.id)
+            if existing_student:
+                logger.info(f"✅ Found existing student: {existing_student.get('name', 'Unknown')}")
+                keyboard = [
+                    [KeyboardButton("📚 المواد الأسبوعية"), KeyboardButton("📝 الاختبارات")],
+                    [KeyboardButton("📊 تقدمي"), KeyboardButton("⚙️ الإعدادات")],
+                    [KeyboardButton("📞 التواصل"), KeyboardButton("ℹ️ المساعدة")]
+                ]
+                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+                
+                display_name = existing_student.get('name') or user.first_name or user.username or 'صديق'
+                await update.message.reply_text(
+                    f"مرحباً بك مرة أخرى {display_name}! 👋\n\n"
+                    "كيف يمكنني مساعدتك اليوم؟",
+                    reply_markup=reply_markup
+                )
+                
+                # Log student activity
+                await self.analytics_service.log_student_activity(
+                    existing_student['id'], 'start_command', {'action': 'returning_user'}
+                )
+                return
 
-        # Auto-register new user with Telegram info
-        await self._auto_register_user(update, context)
-        return ConversationHandler.END
+            # Auto-register new user with Telegram info
+            logger.info(f"📝 New user {user.id}, starting auto-registration...")
+            await self._auto_register_user(update, context)
+            
+        except Exception as e:
+            logger.error(f"❌ Error in start command: {e}")
+            try:
+                await update.message.reply_text(
+                    "مرحباً! 👋\n\n"
+                    "يبدو أن هناك مشكلة مؤقتة. الرجاء المحاولة مرة أخرى خلال قليل.\n\n"
+                    "إذا استمرت المشكلة، تواصل مع الإدارة."
+                )
+            except Exception as reply_error:
+                logger.error(f"❌ Failed to send error message: {reply_error}")
 
     async def _auto_register_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Automatically register user using Telegram information"""
@@ -515,14 +530,3 @@ class StudentHandler:
             logger.error(f"Error showing settings: {e}")
             await query.edit_message_text("حدث خطأ في عرض الإعدادات.")
 
-    def get_conversation_handler(self):
-        """Return the conversation handler for registration"""
-        return ConversationHandler(
-            entry_points=[],  # Will be set in main app
-            states={
-                AWAITING_NAME: [],
-                AWAITING_PHONE: [],
-                AWAITING_SECTION: []
-            },
-            fallbacks=[]
-        )
