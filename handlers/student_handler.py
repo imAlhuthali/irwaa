@@ -50,8 +50,6 @@ class StudentHandler:
                 display_name = existing_student['name'] or user.first_name or user.username or 'الطالب'
                 welcome_back_message = (
                     f"مرحباً بعودتك {display_name}! 👋\n\n"
-                    f"📚 صفك الدراسي: {existing_student['section']}\n"
-                    f"📅 عضو منذ: {existing_student['registration_date'].strftime('%Y-%m-%d')}\n\n"
                     "يمكنك الوصول إلى جميع الميزات باستخدام الأزرار أدناه:"
                 )
                 
