@@ -18,6 +18,9 @@ os.makedirs('content', exist_ok=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Railway deployment marker
+DEPLOYMENT_VERSION = "v2.0"
+
 async def main():
     """Main startup function"""
     try:
