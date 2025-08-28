@@ -272,14 +272,21 @@ class TelegramBot:
         await self.app.initialize()
         await self.app.start()
         
-        # Set webhook
-        webhook_success = await self.set_webhook()
-        if not webhook_success:
-            logger.error("Failed to set webhook, falling back to polling mode")
-            await self.start_polling()
-            return
+        # Set webhook only if WEBHOOK_URL is configured
+        if self.config.WEBHOOK_URL:
+            webhook_success = await self.set_webhook()
+            if not webhook_success:
+                logger.error("Failed to set webhook, but continuing with HTTP server...")
+        else:
+            # No webhook URL configured, so remove any existing webhook and use polling + HTTP server
+            logger.info("No WEBHOOK_URL configured, removing webhook and starting polling in background...")
+            await self.remove_webhook()
+            
+            # Start polling in background
+            import asyncio
+            asyncio.create_task(self.app.updater.start_polling(drop_pending_updates=True))
         
-        # Start FastAPI server
+        # Start FastAPI server (always serve HTTP endpoints for health checks)
         config = uvicorn.Config(
             app=self.fastapi_app,
             host=host,
@@ -473,7 +480,8 @@ async def main():
         await bot.initialize()
         
         # Choose mode based on configuration
-        if bot.config.WEBHOOK_URL:
+        # Force webhook mode on Railway (detected by PORT env var)
+        if bot.config.WEBHOOK_URL or os.getenv('PORT'):
             logger.info("Starting in webhook mode...")
             # Use Railway's PORT environment variable if available
             port = int(os.getenv('PORT', bot.config.WEBHOOK_PORT))
