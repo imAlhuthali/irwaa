@@ -486,18 +486,34 @@ async def main():
         await bot.initialize()
         
         # Choose mode based on configuration
-        # Force webhook mode on Railway (detected by PORT env var)
-        if bot.config.WEBHOOK_URL or os.getenv('PORT'):
-            logger.info("Starting in webhook mode...")
-            # Use Railway's PORT environment variable if available
-            port = int(os.getenv('PORT', bot.config.WEBHOOK_PORT))
-            await bot.start_webhook(
-                host="0.0.0.0",
-                port=port
+        # FORCE POLLING MODE (webhook was causing issues)
+        logger.info("🔄 FORCED POLLING MODE - webhook disabled for debugging...")
+        
+        # Start bot polling
+        await bot.app.initialize()
+        await bot.app.start()
+        await bot.app.updater.start_polling(drop_pending_updates=True)
+        logger.info("✅ Bot polling started successfully")
+        
+        # Start health server for Railway
+        port = int(os.getenv('PORT', 8000))
+        logger.info(f"🏥 Starting health server on port {port}")
+        import uvicorn
+        import threading
+        
+        def run_health_server():
+            config = uvicorn.Config(
+                app=bot.fastapi_app,
+                host="0.0.0.0", 
+                port=port,
+                log_level="info"
             )
-        else:
-            logger.info("Starting in polling mode...")
-            await bot.start_polling()
+            server = uvicorn.Server(config)
+            asyncio.run(server.serve())
+        
+        health_thread = threading.Thread(target=run_health_server, daemon=True)
+        health_thread.start()
+        logger.info("✅ Health server started in background")
             
         # Keep the application running
         while True:

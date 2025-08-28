@@ -44,4 +44,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 # Use Python startup script (no bash needed)
-CMD python simple_test_bot.py
+CMD python start.py

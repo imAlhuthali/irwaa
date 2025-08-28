@@ -29,36 +29,28 @@ class StudentHandler:
         """Handle /start command in Arabic"""
         try:
             user = update.effective_user
-            logger.info(f"🚀 Start command received from user {user.id} (@{user.username or 'no_username'})")
+            logger.info(f"🎯 START COMMAND RECEIVED! User {user.id} (@{user.username or 'no_username'})")
+            logger.info(f"🎯 Message text: {update.message.text}")
+            logger.info(f"🎯 Handler function called successfully!")
             
+            # TEMPORARY DEBUG - Skip database for now
+            logger.info("🧪 DEBUG MODE - Sending simple response without database...")
+            
+            await update.message.reply_text(
+                "🎉 مرحباً! البوت الرئيسي يعمل الآن!\n\n"
+                "Welcome! The main bot is now working!\n\n"
+                "✅ Start command received successfully\n"
+                "✅ Handler is working\n"
+                "✅ Response sent successfully"
+            )
+            
+            logger.info("✅ Simple response sent successfully!")
+            return
+            
+            # TODO: Re-enable database functionality later
             # Check if user is already registered
-            logger.info(f"Checking if user {user.id} is already registered...")
-            existing_student = await self.db.get_student_by_telegram_id(user.id)
-            if existing_student:
-                logger.info(f"✅ Found existing student: {existing_student.get('name', 'Unknown')}")
-                keyboard = [
-                    [KeyboardButton("📚 المواد الأسبوعية"), KeyboardButton("📝 الاختبارات")],
-                    [KeyboardButton("📊 تقدمي"), KeyboardButton("⚙️ الإعدادات")],
-                    [KeyboardButton("📞 التواصل"), KeyboardButton("ℹ️ المساعدة")]
-                ]
-                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-                
-                display_name = existing_student.get('name') or user.first_name or user.username or 'صديق'
-                await update.message.reply_text(
-                    f"مرحباً بك مرة أخرى {display_name}! 👋\n\n"
-                    "كيف يمكنني مساعدتك اليوم؟",
-                    reply_markup=reply_markup
-                )
-                
-                # Log student activity
-                await self.analytics_service.log_student_activity(
-                    existing_student['id'], 'start_command', {'action': 'returning_user'}
-                )
-                return
-
-            # Auto-register new user with Telegram info
-            logger.info(f"📝 New user {user.id}, starting auto-registration...")
-            await self._auto_register_user(update, context)
+            # logger.info(f"Checking if user {user.id} is already registered...")
+            # existing_student = await self.db.get_student_by_telegram_id(user.id)
             
         except Exception as e:
             logger.error(f"❌ Error in start command: {e}")
