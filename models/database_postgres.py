@@ -127,8 +127,17 @@ class PostgreSQLManager:
                     show_results_immediately BOOLEAN DEFAULT TRUE,
                     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     difficulty_level VARCHAR(20) DEFAULT 'medium',
-                    available_from_week INTEGER DEFAULT 1
+                    available_from_week INTEGER DEFAULT 1,
+                    quiz_type VARCHAR(20) DEFAULT 'regular',
+                    week_number INTEGER,
+                    start_week INTEGER,
+                    end_week INTEGER
                 );
+            ''')
+            
+            await conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_quizzes_type_week ON quizzes(quiz_type, week_number);
+                CREATE INDEX IF NOT EXISTS idx_quizzes_section_week ON quizzes(section, week_number);
             ''')
             
             # Questions table
@@ -538,3 +547,58 @@ class PostgreSQLManager:
                 attempt_data.get('attempt_number', 1)
             )
             return attempt_id
+    
+    # Learning progression methods
+    async def get_student_activities_by_type(self, student_id: int, activity_type: str) -> List[Dict[str, Any]]:
+        """Get student activities filtered by type"""
+        async with self.get_connection() as conn:
+            query = '''
+                SELECT * FROM student_activities 
+                WHERE student_id = $1 AND activity_type = $2
+                ORDER BY timestamp DESC
+            '''
+            rows = await conn.fetch(query, student_id, activity_type)
+            return [dict(row) for row in rows]
+    
+    async def get_student_recent_activities(self, student_id: int, days: int = 7) -> List[Dict[str, Any]]:
+        """Get recent student activities"""
+        async with self.get_connection() as conn:
+            query = '''
+                SELECT * FROM student_activities 
+                WHERE student_id = $1 
+                AND timestamp >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                ORDER BY timestamp DESC
+            ''' % days
+            rows = await conn.fetch(query, student_id)
+            return [dict(row) for row in rows]
+    
+    async def get_quiz_by_type_and_week(self, section: str, quiz_type: str, week_number: int) -> Optional[Dict[str, Any]]:
+        """Get quiz by type and week"""
+        async with self.get_connection() as conn:
+            query = '''
+                SELECT * FROM quizzes 
+                WHERE section = $1 AND quiz_type = $2 AND week_number = $3 AND is_active = TRUE
+            '''
+            row = await conn.fetchrow(query, section, quiz_type, week_number)
+            return dict(row) if row else None
+    
+    async def get_cumulative_quiz(self, section: str, start_week: int, end_week: int) -> Optional[Dict[str, Any]]:
+        """Get cumulative quiz for week range"""
+        async with self.get_connection() as conn:
+            query = '''
+                SELECT * FROM quizzes 
+                WHERE section = $1 AND quiz_type = 'cumulative' 
+                AND start_week = $2 AND end_week = $3 AND is_active = TRUE
+            '''
+            row = await conn.fetchrow(query, section, start_week, end_week)
+            return dict(row) if row else None
+    
+    async def update_student_week(self, student_id: int, current_week: int, completed_weeks: int):
+        """Update student's week progression"""
+        async with self.get_connection() as conn:
+            query = '''
+                UPDATE students 
+                SET current_week = $2, completed_weeks = $3, last_activity = CURRENT_TIMESTAMP
+                WHERE id = $1
+            '''
+            await conn.execute(query, student_id, current_week, completed_weeks)

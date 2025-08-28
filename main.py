@@ -29,6 +29,7 @@ from handlers.student_handler import StudentHandler, AWAITING_NAME, AWAITING_PHO
 from services.content_service import ContentService
 from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
+from services.learning_progression_service import LearningProgressionService
 from utils.scheduler import TaskScheduler
 
 # Create logs directory if it doesn't exist
@@ -60,6 +61,7 @@ class TelegramBot:
         self.content_service: Optional[ContentService] = None
         self.quiz_service: Optional[QuizService] = None
         self.analytics_service: Optional[AnalyticsService] = None
+        self.learning_service: Optional[LearningProgressionService] = None
         self.scheduler: Optional[TaskScheduler] = None
         self.fastapi_app = FastAPI(title="Educational Telegram Bot API")
         
@@ -78,11 +80,14 @@ class TelegramBot:
             self.content_service = ContentService(self.db_manager)
             self.quiz_service = QuizService(self.db_manager)
             self.analytics_service = AnalyticsService(self.db_manager)
+            self.learning_service = LearningProgressionService(
+                self.db_manager, self.content_service, self.quiz_service
+            )
             
             # Initialize handlers
             self.student_handler = StudentHandler(
                 self.db_manager, self.content_service, 
-                self.quiz_service, self.analytics_service
+                self.quiz_service, self.analytics_service, self.learning_service
             )
             
             # Initialize scheduler
@@ -439,8 +444,40 @@ def setup_signal_handlers(bot: TelegramBot):
 
 async def main():
     """Main application entry point"""
-    bot = TelegramBot()
-    setup_signal_handlers(bot)
+    try:
+        bot = TelegramBot()
+        setup_signal_handlers(bot)
+    except ValueError as config_error:
+        # Configuration error - start minimal health server
+        logger.error(f"Configuration error: {config_error}")
+        logger.info("Starting minimal health server for Railway...")
+        
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
+        import uvicorn
+        
+        health_app = FastAPI()
+        
+        @health_app.get("/health")
+        async def health():
+            return JSONResponse({
+                "status": "waiting_for_config",
+                "message": "Set BOT_TOKEN and ADMIN_IDS environment variables",
+                "timestamp": datetime.now().isoformat()
+            })
+        
+        @health_app.get("/")
+        async def root():
+            return JSONResponse({
+                "message": "Educational Telegram Bot - Configuration Required",
+                "required_vars": ["BOT_TOKEN", "ADMIN_IDS"]
+            })
+        
+        port = int(os.getenv('PORT', 8000))
+        await uvicorn.Server(
+            uvicorn.Config(health_app, host="0.0.0.0", port=port)
+        ).serve()
+        return
     
     try:
         # Initialize bot
