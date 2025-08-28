@@ -371,6 +371,16 @@ class DatabaseManager:
     async def update_student_notification_setting(self, telegram_id: int, enabled: bool) -> bool:
         return True
     
+    async def update_student_section(self, telegram_id: int, section: str) -> bool:
+        """Update student section"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'UPDATE students SET section = ? WHERE telegram_id = ?',
+                (section, telegram_id)
+            )
+            await db.commit()
+        return True
+    
     async def get_all_active_students(self) -> List[Dict[str, Any]]:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row

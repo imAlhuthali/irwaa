@@ -312,6 +312,35 @@ class PostgreSQLManager:
                     return ["الصف الأول", "الصف الثاني", "الصف الثالث"]
         except:
             return ["الصف الأول", "الصف الثاني", "الصف الثالث"]
+    
+    async def get_student_notification_setting(self, telegram_id: int) -> bool:
+        """Get student notification setting"""
+        async with self.get_connection() as conn:
+            query = 'SELECT notification_enabled FROM students WHERE telegram_id = $1'
+            row = await conn.fetchrow(query, telegram_id)
+            return row['notification_enabled'] if row else True
+    
+    async def update_student_notification_setting(self, telegram_id: int, enabled: bool) -> bool:
+        """Update student notification setting"""
+        async with self.get_connection() as conn:
+            query = '''
+                UPDATE students 
+                SET notification_enabled = $2, last_activity = CURRENT_TIMESTAMP 
+                WHERE telegram_id = $1
+            '''
+            await conn.execute(query, telegram_id, enabled)
+        return True
+    
+    async def update_student_section(self, telegram_id: int, section: str) -> bool:
+        """Update student section"""
+        async with self.get_connection() as conn:
+            query = '''
+                UPDATE students 
+                SET section = $2, last_activity = CURRENT_TIMESTAMP 
+                WHERE telegram_id = $1
+            '''
+            await conn.execute(query, telegram_id, section)
+        return True
 
     # Material operations
     async def create_material(self, material_data: Dict[str, Any]) -> int:

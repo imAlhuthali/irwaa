@@ -16,7 +16,7 @@ from typing import Optional
 from telegram import Update, BotCommand
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ConversationHandler, filters
+    filters
 )
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException
@@ -25,7 +25,7 @@ import json
 
 from config.settings import BotConfig
 from models import get_database_manager
-from handlers.student_handler import StudentHandler, AWAITING_NAME, AWAITING_PHONE, AWAITING_SECTION
+from handlers.student_handler import StudentHandler
 from services.content_service import ContentService
 from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
@@ -120,19 +120,8 @@ class TelegramBot:
 
     async def _setup_handlers(self):
         """Setup all message and callback handlers"""
-        # Registration conversation handler
-        registration_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', self.student_handler.start_command)],
-            states={
-                AWAITING_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.student_handler.register_name)],
-                AWAITING_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.student_handler.register_phone)],
-                AWAITING_SECTION: [CallbackQueryHandler(self.student_handler.register_section, pattern='^section:')]
-            },
-            fallbacks=[CommandHandler('start', self.student_handler.start_command)]
-        )
-        
-        # Add handlers to application
-        self.app.add_handler(registration_handler)
+        # Simple start command handler (no conversation needed for auto-registration)
+        self.app.add_handler(CommandHandler('start', self.student_handler.start_command))
         
         # Text message handlers for main menu buttons
         self.app.add_handler(MessageHandler(
