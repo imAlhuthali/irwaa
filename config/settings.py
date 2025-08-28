@@ -39,20 +39,22 @@ class BotConfig:
     CLEANUP_INTERVAL_HOURS: int = int(os.getenv('CLEANUP_INTERVAL_HOURS', '24'))
     
     def __init__(self):
-        # Validate required settings with more informative messages
+        """Initialize configuration with validation"""
+        self._validate_required_config()
+    
+    def _validate_required_config(self):
+        """Validate required configuration settings"""
+        missing_vars = []
+        
         if not self.BOT_TOKEN:
-            import logging
-            logging.error("BOT_TOKEN environment variable is missing. Please set it in Railway dashboard.")
-            if not os.getenv('RAILWAY_ENVIRONMENT'):
-                # Only raise in non-Railway environments
-                raise ValueError("BOT_TOKEN environment variable is required")
+            missing_vars.append('BOT_TOKEN')
         
         if not self.ADMIN_IDS:
-            import logging  
-            logging.error("ADMIN_IDS environment variable is missing. Please set it in Railway dashboard.")
-            if not os.getenv('RAILWAY_ENVIRONMENT'):
-                # Only raise in non-Railway environments  
-                raise ValueError("ADMIN_IDS environment variable is required")
+            missing_vars.append('ADMIN_IDS')
+        
+        if missing_vars:
+            error_msg = f"Missing required environment variables: {', '.join(missing_vars)}"
+            raise ValueError(error_msg)
     
     @property
     def is_valid(self) -> bool:

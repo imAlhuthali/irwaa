@@ -47,7 +47,13 @@ logger = logging.getLogger(__name__)
 
 class TelegramBot:
     def __init__(self):
-        self.config = BotConfig()
+        try:
+            self.config = BotConfig()
+        except ValueError as e:
+            logger.error(f"Configuration error: {e}")
+            logger.error("Please set the required environment variables in Railway dashboard")
+            raise
+            
         self.app: Optional[Application] = None
         self.db_manager = None
         self.student_handler: Optional[StudentHandler] = None
@@ -55,7 +61,7 @@ class TelegramBot:
         self.quiz_service: Optional[QuizService] = None
         self.analytics_service: Optional[AnalyticsService] = None
         self.scheduler: Optional[TaskScheduler] = None
-        self.fastapi_app = FastAPI(title="Telegram Bot Webhook")
+        self.fastapi_app = FastAPI(title="Educational Telegram Bot API")
         
     async def initialize(self):
         """Initialize all bot components"""
@@ -200,26 +206,24 @@ class TelegramBot:
         @self.fastapi_app.get("/health")
         async def health_check():
             try:
-                db_healthy = await self.db_manager.health_check()
-                bot_username = self.app.bot.username if self.app and self.app.bot else "unknown"
+                # Check database health
+                db_healthy = True
+                if self.db_manager:
+                    db_healthy = await self.db_manager.health_check()
+                
+                # Check bot status
+                bot_active = self.app is not None
                 
                 return JSONResponse({
-                    "status": "healthy" if db_healthy else "degraded",
+                    "status": "healthy" if (db_healthy and bot_active) else "degraded",
                     "timestamp": datetime.now().isoformat(),
-                    "services": {
-                        "database": "healthy" if db_healthy else "unhealthy",
-                        "bot": "active" if self.app else "inactive",
-                        "webhook": "configured"
-                    },
-                    "bot_info": {
-                        "username": bot_username
-                    }
+                    "database": "healthy" if db_healthy else "unhealthy",
+                    "bot": "active" if bot_active else "inactive"
                 })
-            except Exception as e:
+            except Exception:
                 return JSONResponse({
                     "status": "unhealthy",
-                    "timestamp": datetime.now().isoformat(),
-                    "error": "Health check failed"
+                    "timestamp": datetime.now().isoformat()
                 }, status_code=503)
 
         @self.fastapi_app.get("/")
@@ -446,7 +450,7 @@ async def main():
         if bot.config.WEBHOOK_URL:
             logger.info("Starting in webhook mode...")
             # Use Railway's PORT environment variable if available
-            port = int(os.getenv('PORT', bot.config.PORT))
+            port = int(os.getenv('PORT', bot.config.WEBHOOK_PORT))
             await bot.start_webhook(
                 host="0.0.0.0",
                 port=port
