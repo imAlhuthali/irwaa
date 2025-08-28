@@ -1,6 +1,3 @@
-from .student import Student
-from .quiz import QuizQuestion, QuizAttempt
-from .analytics import DailyAnalytics, WeeklyReport, SystemMetrics
 from .database import DatabaseManager
 from .database_postgres import PostgreSQLManager
 import os
@@ -20,12 +17,6 @@ def get_database_manager():
         return DatabaseManager(database_url)
 
 __all__ = [
-    'Student',
-    'QuizQuestion',
-    'QuizAttempt',
-    'DailyAnalytics',
-    'WeeklyReport',
-    'SystemMetrics',
     'DatabaseManager',
     'PostgreSQLManager',
     'get_database_manager'
