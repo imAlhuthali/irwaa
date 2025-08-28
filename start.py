@@ -37,6 +37,13 @@ async def main():
         
         if database_url:
             logger.info(f"Database type: {'PostgreSQL' if 'postgres' in database_url else 'SQLite'}")
+            logger.info(f"Database host: {database_url.split('@')[1].split('/')[0] if '@' in database_url else 'unknown'}")
+            
+        if bot_token:
+            logger.info(f"Bot token starts with: {bot_token[:10]}...")
+            
+        if admin_ids:
+            logger.info(f"Admin IDs: {admin_ids}")
         
         if not bot_token:
             logger.warning("BOT_TOKEN not set - starting health-only mode")
@@ -49,8 +56,16 @@ async def main():
         # Test database connection before starting bot
         await test_database_connection()
         
-        from main import main as run_bot
-        await run_bot()
+        logger.info("🤖 Starting main bot application...")
+        try:
+            from main import main as run_bot
+            logger.info("✅ Main module imported successfully")
+            await run_bot()
+        except Exception as main_error:
+            logger.error(f"❌ Failed to start main bot: {main_error}")
+            import traceback
+            logger.error(f"Main bot error traceback: {traceback.format_exc()}")
+            raise
         
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
