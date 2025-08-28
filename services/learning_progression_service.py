@@ -179,10 +179,11 @@ class LearningProgressionService:
         await self.db.create_question(question_data)
         
         # Update quiz totals
-        await self.db.execute('''
-            UPDATE quizzes SET total_questions = 1, total_points = 1 
-            WHERE id = $1
-        ''', quiz_id)
+        async with self.db.get_connection() as conn:
+            await conn.execute('''
+                UPDATE quizzes SET total_questions = 1, total_points = 1 
+                WHERE id = $1
+            ''', quiz_id)
         
         return await self.db.get_quiz_by_id(quiz_id)
     
@@ -247,10 +248,11 @@ class LearningProgressionService:
             total_points += points
         
         # Update quiz totals
-        await self.db.execute('''
-            UPDATE quizzes SET total_questions = $1, total_points = $2 
-            WHERE id = $3
-        ''', num_questions, total_points, quiz_id)
+        async with self.db.get_connection() as conn:
+            await conn.execute('''
+                UPDATE quizzes SET total_questions = $1, total_points = $2 
+                WHERE id = $3
+            ''', num_questions, total_points, quiz_id)
         
         return await self.db.get_quiz_by_id(quiz_id)
     
@@ -354,13 +356,14 @@ class LearningProgressionService:
     
     async def _advance_student_week(self, student_id: int):
         """Advance student to next week"""
-        await self.db.execute('''
-            UPDATE students 
-            SET completed_weeks = current_week,
-                current_week = current_week + 1,
-                last_activity = CURRENT_TIMESTAMP
-            WHERE id = $1
-        ''', student_id)
+        async with self.db.get_connection() as conn:
+            await conn.execute('''
+                UPDATE students 
+                SET completed_weeks = current_week,
+                    current_week = current_week + 1,
+                    last_activity = CURRENT_TIMESTAMP
+                WHERE id = $1
+            ''', student_id)
     
     def _calculate_difficulty_for_week(self, week: int) -> str:
         """Calculate appropriate difficulty level for week"""

@@ -17,11 +17,13 @@ AWAITING_NAME, AWAITING_PHONE, AWAITING_SECTION = range(3)
 
 class StudentHandler:
     def __init__(self, db_manager, content_service: ContentService, 
-                 quiz_service: QuizService, analytics_service: AnalyticsService):
+                 quiz_service: QuizService, analytics_service: AnalyticsService, 
+                 learning_service=None):
         self.db = db_manager
         self.content_service = content_service
         self.quiz_service = quiz_service
         self.analytics_service = analytics_service
+        self.learning_service = learning_service
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Handle /start command in Arabic"""
