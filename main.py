@@ -23,6 +23,11 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 import json
 
+# Production scalability imports
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from config.settings import BotConfig
 from models import get_database_manager
 from handlers.student_handler import StudentHandler
@@ -31,20 +36,46 @@ from services.quiz_service import QuizService
 from services.analytics_service import AnalyticsService
 from services.learning_progression_service import LearningProgressionService
 from utils.scheduler import TaskScheduler
+from utils.cache import cache_manager
+from utils.circuit_breaker import with_database_circuit_breaker
+from utils.monitoring import (
+    comprehensive_health_check, 
+    get_metrics_response,
+    track_request,
+    metrics_updater_task
+)
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
 
-# Configure logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.FileHandler('logs/bot.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# Configure structured logging for production
+PRODUCTION_MODE = os.getenv('ENVIRONMENT', 'development') == 'production'
+
+if PRODUCTION_MODE:
+    # Structured JSON logging for production
+    import structlog
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=structlog.WriteLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+    logger = structlog.get_logger(__name__)
+else:
+    # Traditional logging for development
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO,
+        handlers=[
+            logging.FileHandler('logs/bot.log'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    logger = logging.getLogger(__name__)
 
 class TelegramBot:
     def __init__(self):
@@ -63,17 +94,32 @@ class TelegramBot:
         self.analytics_service: Optional[AnalyticsService] = None
         self.learning_service: Optional[LearningProgressionService] = None
         self.scheduler: Optional[TaskScheduler] = None
+        
+        # Initialize FastAPI with rate limiting for production scalability
         self.fastapi_app = FastAPI(title="Educational Telegram Bot API")
+        
+        # Rate limiter - Critical for 7000+ users protection
+        self.limiter = Limiter(
+            key_func=get_remote_address,
+            default_limits=["100/minute", "2000/hour"]  # Conservative limits for educational use
+        )
+        self.fastapi_app.state.limiter = self.limiter
+        self.fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         
     async def initialize(self):
         """Initialize all bot components"""
         try:
-            # Initialize database
+            # Initialize database with circuit breaker protection
             logger.info("Initializing database connection...")
             self.db_manager = get_database_manager()
             logger.info(f"Using database manager: {type(self.db_manager).__name__}")
             await self.db_manager.initialize()
             logger.info("Database tables created/verified successfully")
+            
+            # Initialize Redis cache for production scalability
+            logger.info("Initializing cache layer...")
+            await cache_manager.initialize()
+            logger.info("Cache layer ready")
             
             # Initialize services
             logger.info("Initializing services...")
@@ -111,6 +157,10 @@ class TelegramBot:
             
             # Start scheduler
             await self.scheduler.start()
+            
+            # Start metrics updater for production monitoring
+            logger.info("Starting production monitoring...")
+            asyncio.create_task(metrics_updater_task(self))
             
             logger.info("Bot initialization completed successfully!")
             
@@ -182,6 +232,7 @@ class TelegramBot:
     def _setup_webhook_endpoint(self):
         """Setup FastAPI webhook endpoint"""
         @self.fastapi_app.post(f"/webhook/{self.config.BOT_TOKEN}")
+        @self.limiter.limit("200/minute")  # Higher limit for webhook endpoint
         async def webhook_handler(request: Request):
             try:
                 # Get update from request
@@ -198,27 +249,18 @@ class TelegramBot:
                 raise HTTPException(status_code=500, detail="Internal server error")
 
         @self.fastapi_app.get("/health")
+        @self.limiter.limit("50/minute")
         async def health_check():
-            try:
-                # Check database health
-                db_healthy = True
-                if self.db_manager:
-                    db_healthy = await self.db_manager.health_check()
-                
-                # Check bot status
-                bot_active = self.app is not None
-                
-                return JSONResponse({
-                    "status": "healthy" if (db_healthy and bot_active) else "degraded",
-                    "timestamp": datetime.now().isoformat(),
-                    "database": "healthy" if db_healthy else "unhealthy",
-                    "bot": "active" if bot_active else "inactive"
-                })
-            except Exception:
-                return JSONResponse({
-                    "status": "unhealthy",
-                    "timestamp": datetime.now().isoformat()
-                }, status_code=503)
+            async with track_request("health_check"):
+                health_data = await comprehensive_health_check(self)
+                status_code = 200 if health_data['healthy'] else 503
+                return JSONResponse(health_data, status_code=status_code)
+        
+        @self.fastapi_app.get("/metrics")
+        @self.limiter.limit("30/minute")
+        async def metrics():
+            """Prometheus metrics endpoint for production monitoring"""
+            return get_metrics_response()
 
         @self.fastapi_app.get("/")
         async def root():

@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 import asyncio
 import json
+import os
 from collections import defaultdict, Counter
 from dataclasses import dataclass
 from enum import Enum
@@ -33,8 +34,11 @@ class AnalyticsService:
     def __init__(self, db_manager):
         self.db = db_manager
         self.activity_buffer = []
-        self.buffer_size = 100
+        # Production-optimized buffer size for 7000+ users
+        self.buffer_size = int(os.getenv('ANALYTICS_BUFFER_SIZE', '500'))
+        self.max_buffer_size = int(os.getenv('ANALYTICS_MAX_BUFFER_SIZE', '2000'))  # Emergency limit
         self.realtime_subscribers = set()
+        self._flush_lock = asyncio.Lock()  # Prevent concurrent flushes
         
     async def log_student_activity(self, student_id: int, activity_type: str, 
                                  metadata: Optional[Dict[str, Any]] = None, 
@@ -49,11 +53,16 @@ class AnalyticsService:
                 session_id=session_id
             )
             
-            # Add to buffer
+            # Add to buffer with overflow protection
             self.activity_buffer.append(activity)
             
-            # Store in database if buffer is full
-            if len(self.activity_buffer) >= self.buffer_size:
+            # Emergency flush if buffer exceeds maximum size
+            if len(self.activity_buffer) >= self.max_buffer_size:
+                logger.warning(f"Analytics buffer overflow: {len(self.activity_buffer)} items, forcing flush")
+                await self._flush_activity_buffer()
+            
+            # Normal flush when buffer reaches target size
+            elif len(self.activity_buffer) >= self.buffer_size:
                 await self._flush_activity_buffer()
             
             # Send real-time updates
@@ -661,28 +670,48 @@ class AnalyticsService:
             return ["استمر في التعلم والممارسة!"]
 
     async def _flush_activity_buffer(self):
-        """Flush activity buffer to database"""
-        if not self.activity_buffer:
-            return
-        
-        try:
-            activities_data = []
-            for activity in self.activity_buffer:
-                activities_data.append({
-                    'student_id': activity.student_id,
-                    'activity_type': activity.activity_type,
-                    'timestamp': activity.timestamp,
-                    'metadata': json.dumps(activity.metadata),
-                    'session_id': activity.session_id
-                })
+        """Production-optimized activity buffer flush with error handling"""
+        # Use lock to prevent concurrent flushes that could cause data loss
+        async with self._flush_lock:
+            if not self.activity_buffer:
+                return
             
-            await self.db.bulk_insert_activities(activities_data)
-            self.activity_buffer.clear()
+            buffer_copy = self.activity_buffer.copy()
+            buffer_size = len(buffer_copy)
             
-            logger.info(f"Flushed {len(activities_data)} activities to database")
+            try:
+                activities_data = []
+                for activity in buffer_copy:
+                    activities_data.append({
+                        'student_id': activity.student_id,
+                        'activity_type': activity.activity_type,
+                        'timestamp': activity.timestamp,
+                        'metadata': json.dumps(activity.metadata),
+                        'session_id': activity.session_id
+                    })
+                
+                # Use circuit breaker for database operations
+                from utils.circuit_breaker import with_database_circuit_breaker
+                
+                @with_database_circuit_breaker
+                async def flush_to_db():
+                    return await self.db.bulk_insert_activities(activities_data)
+                
+                await flush_to_db()
+                
+                # Only clear buffer after successful database write
+                self.activity_buffer = self.activity_buffer[buffer_size:]
+                
+                logger.info(f"Successfully flushed {buffer_size} activities to database")
             
-        except Exception as e:
-            logger.error(f"Error flushing activity buffer: {e}")
+            except Exception as e:
+                logger.error(f"Error flushing activity buffer: {e}")
+                # Keep failed items in buffer for retry, but limit buffer size
+                if len(self.activity_buffer) > self.max_buffer_size:
+                    # Drop oldest items if buffer is too large to prevent memory issues
+                    overflow = len(self.activity_buffer) - self.buffer_size
+                    self.activity_buffer = self.activity_buffer[overflow:]
+                    logger.warning(f"Dropped {overflow} old activities due to persistent flush failures")
 
     async def _notify_realtime_subscribers(self, activity: StudentActivity):
         """Notify real-time dashboard subscribers"""

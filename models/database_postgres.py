@@ -19,8 +19,9 @@ class PostgreSQLManager:
             
         self.database_url = database_url
         self.pool: Optional[asyncpg.Pool] = None
-        self.max_connections = int(os.getenv('DB_MAX_CONNECTIONS', '5'))
-        self.min_connections = int(os.getenv('DB_MIN_CONNECTIONS', '1'))
+        # Production-optimized connection pool for 7000+ concurrent users
+        self.max_connections = int(os.getenv('DB_MAX_CONNECTIONS', '50'))
+        self.min_connections = int(os.getenv('DB_MIN_CONNECTIONS', '10'))
         
     async def initialize(self):
         """Initialize database connection pool and create tables"""

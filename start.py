@@ -240,11 +240,31 @@ async def initialize_database_tables():
             await conn.execute(sql)
             logger.info(f"✅ {table_name} table created")
             
-        # Create essential indexes
+        # Create essential indexes - Production optimized for 7000+ users
         indexes = [
+            # Core user lookups (most frequent)
             'CREATE INDEX IF NOT EXISTS idx_students_telegram_id ON students(telegram_id)',
+            'CREATE INDEX IF NOT EXISTS idx_students_section_active ON students(section, is_active, last_activity DESC)',
+            
+            # Material queries (frequent - weekly access)
             'CREATE INDEX IF NOT EXISTS idx_materials_section_week ON materials(section, week_number)',
+            'CREATE INDEX IF NOT EXISTS idx_materials_active_section ON materials(is_active, section, week_number) WHERE is_active = true',
+            'CREATE INDEX IF NOT EXISTS idx_materials_view_count ON materials(view_count DESC) WHERE is_active = true',
+            
+            # Quiz performance (high volume)
             'CREATE INDEX IF NOT EXISTS idx_quizzes_type_week ON quizzes(quiz_type, week_number)',
+            'CREATE INDEX IF NOT EXISTS idx_quiz_attempts_student_quiz ON quiz_attempts(student_id, quiz_id)',
+            'CREATE INDEX IF NOT EXISTS idx_quiz_attempts_status_time ON quiz_attempts(status, start_time DESC)',
+            'CREATE INDEX IF NOT EXISTS idx_quiz_attempts_student_time ON quiz_attempts(student_id, start_time DESC)',
+            
+            # Analytics queries (heavy load expected)
+            'CREATE INDEX IF NOT EXISTS idx_student_activities_student_time ON student_activities(student_id, timestamp DESC)',
+            'CREATE INDEX IF NOT EXISTS idx_student_activities_type_time ON student_activities(activity_type, timestamp DESC)',
+            'CREATE INDEX IF NOT EXISTS idx_student_activities_session ON student_activities(session_id) WHERE session_id IS NOT NULL',
+            
+            # Questions for quiz display
+            'CREATE INDEX IF NOT EXISTS idx_questions_quiz_order ON questions(quiz_id, order_index)',
+            'CREATE INDEX IF NOT EXISTS idx_questions_difficulty ON questions(difficulty, question_type)',
         ]
         
         for idx_sql in indexes:
