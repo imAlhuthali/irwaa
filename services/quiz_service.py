@@ -348,7 +348,7 @@ class QuizService:
         
         return column_mapping
 
-    async def _parse_excel_row(self, row: pd.Series, column_mapping: Dict[str, str], quiz_id: int) -> Optional[Dict[str, Any]]:
+    async def _parse_excel_row(self, row: Any, column_mapping: Dict[str, str], quiz_id: int) -> Optional[Dict[str, Any]]:
         """Parse a single Excel row into question data"""
         try:
             question_text = str(row[column_mapping['question']]).strip()
