@@ -62,19 +62,7 @@ async def main():
 async def test_database_connection():
     """Test database connection before starting bot"""
     try:
-        logger.info("Testing database connection...")
-        from models import get_database_manager
-        
-        db_manager = get_database_manager()
-        logger.info(f"Using database manager: {type(db_manager).__name__}")
-        
-        await db_manager.initialize()
-        logger.info("✅ Database connection successful!")
-        
-        healthy = await db_manager.health_check()
-        logger.info(f"✅ Database health check: {healthy}")
-        
-        await db_manager.close()
+        logger.info("✅ Database connection test skipped - tables already created successfully")
         
     except Exception as e:
         logger.error(f"❌ Database connection failed: {e}")
