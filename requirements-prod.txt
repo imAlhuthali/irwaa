@@ -5,16 +5,14 @@ python-telegram-bot==20.7
 fastapi==0.104.1
 uvicorn==0.24.0
 
-# Database - Production PostgreSQL and Development SQLite
+# Database - Production PostgreSQL
 asyncpg==0.29.0
-sqlalchemy[asyncio]==2.0.23
+
+# Database - Development SQLite
 aiosqlite==0.19.0
 
 # File Handling
 aiofiles==23.2.1
-
-# HTTP Requests
-httpx==0.25.2
 
 # Environment Management
 python-dotenv==1.0.0
@@ -23,8 +21,5 @@ python-dotenv==1.0.0
 python-dateutil==2.8.2
 pytz==2023.3
 
-# Production Dependencies
-gunicorn==21.2.0
-
-# Excel processing (lighter alternative to pandas)
+# Excel processing (for quiz templates)
 openpyxl==3.1.2

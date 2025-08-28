@@ -4,98 +4,67 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Environments
-.env
-.venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+.venv/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
 
 # Database files
 *.db
-*.sqlite
-*.sqlite3
+*.sqlite*
+telebot.db
+arabic_learning_bot.db
 
-# Log files
-logs/
+# Logs
 *.log
-
-# Uploaded files and content
-uploads/
-content/
-quiz_templates/*.xlsx
-quiz_templates/*.xls
+logs/
+bot.log
 
 # IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# macOS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Docker
-.dockerignore
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Uploads and content (if sensitive)
+uploads/*/
+content/private/
+quiz_templates/private/
 
 # Temporary files
-tmp/
-temp/
 *.tmp
 *.temp
-
-# Environment-specific files
-.env.local
-.env.development
-.env.test
-.env.production
-
-# Bot token and sensitive data
-bot.log
-telebot.db
-
-# Cache
 .cache/
+
+# Railway local files
+.railway-config
+
+# Deployment secrets
+docker-compose.override.yml
+.dockerignore.local
+EOF < /dev/null

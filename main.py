@@ -23,7 +23,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 import json
 
-from config import Config
+from config.settings import BotConfig
 from models import get_database_manager
 from handlers.student_handler import StudentHandler, AWAITING_NAME, AWAITING_PHONE, AWAITING_SECTION
 from services.content_service import ContentService
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 class TelegramBot:
     def __init__(self):
-        self.config = Config()
+        self.config = BotConfig()
         self.app: Optional[Application] = None
         self.db_manager = None
         self.student_handler: Optional[StudentHandler] = None
@@ -63,7 +63,9 @@ class TelegramBot:
             # Initialize database
             logger.info("Initializing database connection...")
             self.db_manager = get_database_manager()
+            logger.info(f"Using database manager: {type(self.db_manager).__name__}")
             await self.db_manager.initialize()
+            logger.info("Database tables created/verified successfully")
             
             # Initialize services
             logger.info("Initializing services...")

@@ -1,6 +1,6 @@
-# Educational Telegram Bot
+# 🤖 Educational Telegram Bot
 
-A comprehensive Arabic Telegram bot for educational purposes, featuring quiz management, content delivery, student progress tracking, and analytics dashboard.
+A production-ready educational Telegram bot with PostgreSQL database, user management, content delivery, and analytics - optimized for Railway deployment.
 
 ## Features
 
