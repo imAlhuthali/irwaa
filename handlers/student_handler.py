@@ -26,31 +26,46 @@ class StudentHandler:
         self.learning_service = learning_service
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command in Arabic"""
+        """Handle /start command with proper business flow"""
         try:
             user = update.effective_user
             logger.info(f"🎯 START COMMAND RECEIVED! User {user.id} (@{user.username or 'no_username'})")
-            logger.info(f"🎯 Message text: {update.message.text}")
-            logger.info(f"🎯 Handler function called successfully!")
             
-            # TEMPORARY DEBUG - Skip database for now
-            logger.info("🧪 DEBUG MODE - Sending simple response without database...")
-            
-            await update.message.reply_text(
-                "🎉 مرحباً! البوت الرئيسي يعمل الآن!\n\n"
-                "Welcome! The main bot is now working!\n\n"
-                "✅ Start command received successfully\n"
-                "✅ Handler is working\n"
-                "✅ Response sent successfully"
-            )
-            
-            logger.info("✅ Simple response sent successfully!")
-            return
-            
-            # TODO: Re-enable database functionality later
             # Check if user is already registered
-            # logger.info(f"Checking if user {user.id} is already registered...")
-            # existing_student = await self.db.get_student_by_telegram_id(user.id)
+            logger.info(f"Checking if user {user.id} is already registered...")
+            existing_student = await self.db.get_student_by_telegram_id(user.id)
+            
+            if existing_student:
+                # User already registered - show welcome back message with menu
+                logger.info(f"User {user.id} already registered, showing main menu")
+                
+                # Main menu keyboard
+                keyboard = [
+                    [KeyboardButton("📚 المواد الأسبوعية"), KeyboardButton("📝 الاختبارات")],
+                    [KeyboardButton("📊 تقدمي"), KeyboardButton("⚙️ الإعدادات")],
+                    [KeyboardButton("📞 التواصل"), KeyboardButton("ℹ️ المساعدة")]
+                ]
+                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+                
+                display_name = existing_student['name'] or user.first_name or user.username or 'الطالب'
+                welcome_back_message = (
+                    f"مرحباً بعودتك {display_name}! 👋\n\n"
+                    f"📚 صفك الدراسي: {existing_student['section']}\n"
+                    f"📅 عضو منذ: {existing_student['registration_date'].strftime('%Y-%m-%d')}\n\n"
+                    "يمكنك الوصول إلى جميع الميزات باستخدام الأزرار أدناه:"
+                )
+                
+                await update.message.reply_text(welcome_back_message, reply_markup=reply_markup)
+                
+                # Log activity
+                await self.analytics_service.log_student_activity(
+                    existing_student['id'], 'start_command', {'returning_user': True}
+                )
+                
+            else:
+                # New user - auto register
+                logger.info(f"New user {user.id}, starting auto-registration...")
+                await self._auto_register_user(update, context)
             
         except Exception as e:
             logger.error(f"❌ Error in start command: {e}")
