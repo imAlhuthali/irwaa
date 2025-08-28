@@ -67,4 +67,3 @@ quiz_templates/private/
 # Deployment secrets
 docker-compose.override.yml
 .dockerignore.local
-EOF < /dev/null
