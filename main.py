@@ -199,14 +199,28 @@ class TelegramBot:
 
         @self.fastapi_app.get("/health")
         async def health_check():
-            return JSONResponse({
-                "status": "healthy",
-                "timestamp": datetime.now().isoformat(),
-                "bot_info": {
-                    "username": self.app.bot.username if self.app else None,
-                    "webhook_set": True
-                }
-            })
+            try:
+                db_healthy = await self.db_manager.health_check()
+                bot_username = self.app.bot.username if self.app and self.app.bot else "unknown"
+                
+                return JSONResponse({
+                    "status": "healthy" if db_healthy else "degraded",
+                    "timestamp": datetime.now().isoformat(),
+                    "services": {
+                        "database": "healthy" if db_healthy else "unhealthy",
+                        "bot": "active" if self.app else "inactive",
+                        "webhook": "configured"
+                    },
+                    "bot_info": {
+                        "username": bot_username
+                    }
+                })
+            except Exception as e:
+                return JSONResponse({
+                    "status": "unhealthy",
+                    "timestamp": datetime.now().isoformat(),
+                    "error": "Health check failed"
+                }, status_code=503)
 
         @self.fastapi_app.get("/")
         async def root():

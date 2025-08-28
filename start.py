@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Railway Start Script for Telegram Learning Bot
-Simple wrapper to ensure proper startup in Railway environment
-Version: 1.0.1
+Production Start Script for Educational Telegram Bot
+Handles Railway deployment and ensures proper startup sequence
 """
 
 import os
