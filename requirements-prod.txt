@@ -24,8 +24,8 @@ pytz==2023.3
 # Excel processing (for quiz templates)
 openpyxl==3.1.2
 
-# Production scalability and security
-slowapi==0.1.9
-redis==5.0.1
-structlog==23.2.0
-prometheus-client==0.19.0
+# Production scalability and security - DISABLED FOR NOW
+# slowapi==0.1.9
+# redis==5.0.1  
+# structlog==23.2.0
+# prometheus-client==0.19.0
