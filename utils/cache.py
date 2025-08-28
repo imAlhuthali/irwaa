@@ -35,12 +35,19 @@ class CacheManager:
             return
             
         try:
+            # Check if Redis URL is available
+            if not self.redis_url or self.redis_url == 'redis://localhost:6379/0':
+                logger.warning("No Redis URL configured, disabling cache")
+                self.enabled = False
+                return
+                
             self.redis_client = redis.from_url(
                 self.redis_url,
                 max_connections=20,
                 retry_on_timeout=True,
                 socket_keepalive=True,
-                socket_keepalive_options={}
+                socket_keepalive_options={},
+                socket_connect_timeout=5  # 5 second timeout
             )
             
             # Test connection
@@ -48,8 +55,9 @@ class CacheManager:
             logger.info("✅ Redis cache connected successfully")
             
         except Exception as e:
-            logger.error(f"❌ Redis connection failed: {e}")
+            logger.warning(f"⚠️ Redis connection failed, cache disabled: {e}")
             self.enabled = False
+            self.redis_client = None
     
     async def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""

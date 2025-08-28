@@ -33,12 +33,17 @@ except ImportError:
     print("WARNING: Rate limiting dependencies not available, using basic implementation")
     RATE_LIMITING_AVAILABLE = False
     # Fallback implementations
+    from functools import wraps
+    
     class MockLimiter:
         def __init__(self, *args, **kwargs):
             pass
         def limit(self, *args, **kwargs):
             def decorator(func):
-                return func
+                @wraps(func)
+                async def wrapper(*f_args, **f_kwargs):
+                    return await func(*f_args, **f_kwargs)
+                return wrapper
             return decorator
     
     Limiter = MockLimiter
@@ -67,8 +72,10 @@ except ImportError:
     print("WARNING: Cache utilities not available, using mock implementation")
     CACHE_AVAILABLE = False
     class MockCacheManager:
-        async def initialize(self): pass
-        async def close(self): pass
+        async def initialize(self): 
+            print("INFO: Mock cache manager initialized")
+        async def close(self): 
+            pass
     cache_manager = MockCacheManager()
 
 try:
