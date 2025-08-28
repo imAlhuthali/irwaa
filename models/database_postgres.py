@@ -21,6 +21,9 @@ class PostgreSQLManager:
     async def initialize(self):
         """Initialize database connection pool and create tables"""
         try:
+            logger.info(f"Connecting to PostgreSQL database...")
+            logger.info(f"Database URL: {self.database_url[:30]}...")  # Log first 30 chars only
+            
             # Create connection pool
             self.pool = await asyncpg.create_pool(
                 self.database_url,
@@ -29,13 +32,22 @@ class PostgreSQLManager:
                 command_timeout=60
             )
             
+            logger.info("Database connection pool created successfully")
+            
+            # Test connection
+            async with self.get_connection() as conn:
+                result = await conn.fetchval('SELECT version()')
+                logger.info(f"Connected to: {result}")
+            
             # Create tables
+            logger.info("Creating database tables...")
             await self._create_tables()
             
             logger.info("PostgreSQL database initialized successfully")
             
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
+            logger.error(f"Database URL format: {self.database_url.split('@')[0] if '@' in self.database_url else 'Invalid URL'}")
             raise
 
     async def close(self):
@@ -55,9 +67,10 @@ class PostgreSQLManager:
 
     async def _create_tables(self):
         """Create all necessary tables"""
-        async with self.get_connection() as conn:
-            # Students table
-            await conn.execute('''
+        try:
+            async with self.get_connection() as conn:
+                # Students table
+                await conn.execute('''
                 CREATE TABLE IF NOT EXISTS students (
                     id SERIAL PRIMARY KEY,
                     telegram_id BIGINT UNIQUE NOT NULL,
@@ -76,14 +89,14 @@ class PostgreSQLManager:
             ''')
             
             # Create index for telegram_id
-            await conn.execute('''
+                await conn.execute('''
                 CREATE INDEX IF NOT EXISTS idx_students_telegram_id ON students(telegram_id);
                 CREATE INDEX IF NOT EXISTS idx_students_section ON students(section);
                 CREATE INDEX IF NOT EXISTS idx_students_activity ON students(last_activity);
             ''')
             
             # Materials table
-            await conn.execute('''
+                await conn.execute('''
                 CREATE TABLE IF NOT EXISTS materials (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(500) NOT NULL,
@@ -104,13 +117,13 @@ class PostgreSQLManager:
                 );
             ''')
             
-            await conn.execute('''
+                await conn.execute('''
                 CREATE INDEX IF NOT EXISTS idx_materials_section_week ON materials(section, week_number);
                 CREATE INDEX IF NOT EXISTS idx_materials_hash ON materials(content_hash);
             ''')
             
             # Quizzes table
-            await conn.execute('''
+                await conn.execute('''
                 CREATE TABLE IF NOT EXISTS quizzes (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(500) NOT NULL,
@@ -135,13 +148,13 @@ class PostgreSQLManager:
                 );
             ''')
             
-            await conn.execute('''
+                await conn.execute('''
                 CREATE INDEX IF NOT EXISTS idx_quizzes_type_week ON quizzes(quiz_type, week_number);
                 CREATE INDEX IF NOT EXISTS idx_quizzes_section_week ON quizzes(section, week_number);
             ''')
             
             # Questions table
-            await conn.execute('''
+                await conn.execute('''
                 CREATE TABLE IF NOT EXISTS questions (
                     id SERIAL PRIMARY KEY,
                     quiz_id INTEGER REFERENCES quizzes(id) ON DELETE CASCADE,
@@ -157,12 +170,12 @@ class PostgreSQLManager:
                 );
             ''')
             
-            await conn.execute('''
+                await conn.execute('''
                 CREATE INDEX IF NOT EXISTS idx_questions_quiz ON questions(quiz_id);
             ''')
             
             # Quiz attempts table
-            await conn.execute('''
+                await conn.execute('''
                 CREATE TABLE IF NOT EXISTS quiz_attempts (
                     id SERIAL PRIMARY KEY,
                     student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
@@ -178,13 +191,13 @@ class PostgreSQLManager:
                 );
             ''')
             
-            await conn.execute('''
+                await conn.execute('''
                 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_student ON quiz_attempts(student_id);
                 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id);
             ''')
             
             # Student activities table
-            await conn.execute('''
+                await conn.execute('''
                 CREATE TABLE IF NOT EXISTS student_activities (
                     id SERIAL PRIMARY KEY,
                     student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
@@ -195,14 +208,14 @@ class PostgreSQLManager:
                 );
             ''')
             
-            await conn.execute('''
+                await conn.execute('''
                 CREATE INDEX IF NOT EXISTS idx_activities_student ON student_activities(student_id);
                 CREATE INDEX IF NOT EXISTS idx_activities_timestamp ON student_activities(timestamp);
                 CREATE INDEX IF NOT EXISTS idx_activities_type ON student_activities(activity_type);
             ''')
             
             # Material files table
-            await conn.execute('''
+                await conn.execute('''
                 CREATE TABLE IF NOT EXISTS material_files (
                     id SERIAL PRIMARY KEY,
                     material_id INTEGER REFERENCES materials(id) ON DELETE CASCADE,
@@ -217,7 +230,11 @@ class PostgreSQLManager:
                 );
             ''')
             
-            logger.info("All database tables created successfully")
+                logger.info("All database tables created successfully")
+                
+        except Exception as e:
+            logger.error(f"Failed to create database tables: {e}")
+            raise
 
     async def health_check(self):
         """Check database health"""
