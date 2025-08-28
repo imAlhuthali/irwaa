@@ -2,6 +2,7 @@
 """
 Railway Start Script for Telegram Learning Bot
 Simple wrapper to ensure proper startup in Railway environment
+Version: 1.0.1
 """
 
 import os
