@@ -13,10 +13,14 @@ class PostgreSQLManager:
     """Production-ready PostgreSQL database manager for Telegram bot"""
     
     def __init__(self, database_url: str):
+        # Ensure proper postgresql:// format for asyncpg
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+            
         self.database_url = database_url
         self.pool: Optional[asyncpg.Pool] = None
-        self.max_connections = int(os.getenv('DB_MAX_CONNECTIONS', '10'))
-        self.min_connections = int(os.getenv('DB_MIN_CONNECTIONS', '2'))
+        self.max_connections = int(os.getenv('DB_MAX_CONNECTIONS', '5'))
+        self.min_connections = int(os.getenv('DB_MIN_CONNECTIONS', '1'))
         
     async def initialize(self):
         """Initialize database connection pool and create tables"""
@@ -29,7 +33,10 @@ class PostgreSQLManager:
                 self.database_url,
                 min_size=self.min_connections,
                 max_size=self.max_connections,
-                command_timeout=60
+                command_timeout=60,
+                server_settings={
+                    'application_name': 'educational_telegram_bot',
+                }
             )
             
             logger.info("Database connection pool created successfully")
